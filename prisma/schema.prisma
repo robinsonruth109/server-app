@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id                    Int      @id @default(autoincrement())
+  username              String   @unique
+  password              String
+  balance               Float    @default(0)
+  vipLevel              Int      @default(1)
+  isApproved            Boolean  @default(false)
+  isFrozen              Boolean  @default(false)
+  taxControl            Boolean  @default(false)
+  dailyTaskLimit        Int      @default(25)
+  todayTaskCount        Int      @default(0)
+  workPhase             Int      @default(1)
+  invitationCode        String?  @unique
+  referredByCode        String?
+  createdAt             DateTime @default(now())
+  canGrabOrders         Boolean  @default(false)
+  isManualTaskControl   Boolean  @default(false)
+
+  avatarUrl             String?
+  withdrawalPassword    String?
+
+  withdrawWalletAddress String?
+  withdrawWalletNetwork String?
+  withdrawWalletName    String?
+
+  lastTaskResetAt       DateTime?
+  phase1ComboTaskNo     Int?
+
+  ipLogs                ClientIPLog[]
+  deposits              Deposit[]
+  withdrawals           Withdrawal[]
+  orders                Order[]
+  taskControls          ClientTaskControl[]
+}
+
+model ClientIPLog {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model CompanyWallet {
+  id        Int      @id @default(autoincrement())
+  name      String
+  address   String   @unique
+  currency  String
+  network   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Deposit {
+  id            Int      @id @default(autoincrement())
+  clientId      Int
+  amount        Float
+  confirmationAmount Float?
+  status        String   @default("pending")
+  walletName    String?
+  walletAddress String?
+  currency      String?
+  network       String?
+  createdAt     DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Withdrawal {
+  id         Int      @id @default(autoincrement())
+  clientId   Int
+  amount     Float
+  fee        Float    @default(0)
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id        Int      @id @default(autoincrement())
+  name      String
+  imageUrl  String
+  price     Float
+  platform  String
+  vipLevel  Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  clientId        Int
+  orderNo         String      @unique
+  orderType       String
+  status          String      @default("incomplete")
+  platform        String
+  vipLevel        Int
+  orderAmount     Float
+  commission      Float
+  expectedIncome  Float
+  createdAt       DateTime    @default(now())
+  submittedAt     DateTime?
+
+  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  productId   Int
+  productName String
+  imageUrl    String
+  unitPrice   Float
+  quantity    Int
+  subtotal    Float
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model SystemSetting {
+  id                Int      @id @default(autoincrement())
+  dailyTaskLimit    Int      @default(25)
+
+  vip1MinBalance    Float    @default(20)
+  vip1MaxBalance    Float    @default(498)
+  vip2MinBalance    Float    @default(499)
+  vip2MaxBalance    Float    @default(899)
+  vip3MinBalance    Float    @default(900)
+
+  vip1Commission    Float    @default(0.04)
+  vip2Commission    Float    @default(0.08)
+  vip3Commission    Float    @default(0.12)
+
+  phase1ComboPositions String @default("5")
+  phase2ComboPositions String @default("5,15,25")
+  phase3ComboPositions String @default("3,8,13,18,23")
+
+  comboExtraAmount     Float  @default(200)
+  normalOrderRatio     Float  @default(0.8)
+
+  phase1ComboCount  Int      @default(1)
+  phase2ComboCount  Int      @default(3)
+  phase3ComboCount  Int      @default(5)
+
+  minDeposit        Float    @default(10)
+  minWithdrawal     Float    @default(20)
+  withdrawalFeeRate Float    @default(0.05)
+
+  taxControlMessage String   @default("Contact customer care for tax clearing information")
+
+  telegramGroupLink String?    
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+
+model ClientTaskControl {
+  id         Int      @id @default(autoincrement())
+  clientId   Int
+  taskNo     Int
+  taskAmount Float?
+  commission Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, taskNo])
+}

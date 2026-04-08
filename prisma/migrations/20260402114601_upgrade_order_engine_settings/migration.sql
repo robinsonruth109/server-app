@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "SystemSetting" ADD COLUMN     "comboExtraAmount" DOUBLE PRECISION NOT NULL DEFAULT 200,
+ADD COLUMN     "normalOrderRatio" DOUBLE PRECISION NOT NULL DEFAULT 0.8,
+ADD COLUMN     "phase1ComboPositions" TEXT NOT NULL DEFAULT '5',
+ADD COLUMN     "phase2ComboPositions" TEXT NOT NULL DEFAULT '5,15,25',
+ADD COLUMN     "phase3ComboPositions" TEXT NOT NULL DEFAULT '3,8,13,18,23';

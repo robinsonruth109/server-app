@@ -1,0 +1,24 @@
+-- CreateTable
+CREATE TABLE "SystemSetting" (
+    "id" SERIAL NOT NULL,
+    "dailyTaskLimit" INTEGER NOT NULL DEFAULT 25,
+    "vip1MinBalance" DOUBLE PRECISION NOT NULL DEFAULT 20,
+    "vip1MaxBalance" DOUBLE PRECISION NOT NULL DEFAULT 498,
+    "vip2MinBalance" DOUBLE PRECISION NOT NULL DEFAULT 499,
+    "vip2MaxBalance" DOUBLE PRECISION NOT NULL DEFAULT 899,
+    "vip3MinBalance" DOUBLE PRECISION NOT NULL DEFAULT 900,
+    "vip1Commission" DOUBLE PRECISION NOT NULL DEFAULT 0.04,
+    "vip2Commission" DOUBLE PRECISION NOT NULL DEFAULT 0.08,
+    "vip3Commission" DOUBLE PRECISION NOT NULL DEFAULT 0.12,
+    "phase1ComboCount" INTEGER NOT NULL DEFAULT 1,
+    "phase2ComboCount" INTEGER NOT NULL DEFAULT 3,
+    "phase3ComboCount" INTEGER NOT NULL DEFAULT 5,
+    "minDeposit" DOUBLE PRECISION NOT NULL DEFAULT 10,
+    "minWithdrawal" DOUBLE PRECISION NOT NULL DEFAULT 20,
+    "withdrawalFeeRate" DOUBLE PRECISION NOT NULL DEFAULT 0.05,
+    "taxControlMessage" TEXT NOT NULL DEFAULT 'Contact customer care for tax clearing information',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SystemSetting_pkey" PRIMARY KEY ("id")
+);
