@@ -34,11 +34,19 @@ export class WalletsController {
     return this.walletsService.findAll();
   }
 
+  // Old explicit company route
   @Get('company/:id')
   findOneCompanyWallet(@Param('id', ParseIntPipe) id: number) {
     return this.walletsService.findOne(id);
   }
 
+  // Frontend-friendly generic route
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.walletsService.findOne(id);
+  }
+
+  // Old explicit company route
   @Patch('company/:id')
   updateCompanyWallet(
     @Param('id', ParseIntPipe) id: number,
@@ -47,8 +55,24 @@ export class WalletsController {
     return this.walletsService.update(id, updateWalletDto);
   }
 
+  // Frontend-friendly generic route
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateWalletDto: UpdateWalletDto,
+  ) {
+    return this.walletsService.update(id, updateWalletDto);
+  }
+
+  // Old explicit company route
   @Delete('company/:id')
   removeCompanyWallet(@Param('id', ParseIntPipe) id: number) {
+    return this.walletsService.remove(id);
+  }
+
+  // Frontend-friendly generic route
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
     return this.walletsService.remove(id);
   }
 

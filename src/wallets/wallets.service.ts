@@ -71,7 +71,9 @@ export class WalletsService {
 
     return this.prisma.companyWallet.update({
       where: { id },
-      data: updateWalletDto,
+      data: {
+        ...updateWalletDto,
+      },
     });
   }
 
