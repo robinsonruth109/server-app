@@ -161,7 +161,9 @@ export class ClientsService {
       orderBy: { taskNo: 'asc' },
     });
 
-    const taskControlMap = new Map(rawTaskControls.map((row) => [row.taskNo, row]));
+    const taskControlMap = new Map(
+      rawTaskControls.map((row) => [row.taskNo, row]),
+    );
 
     const taskControls = Array.from({ length: 25 }, (_, index) => {
       const taskNo = index + 1;
@@ -307,7 +309,9 @@ export class ClientsService {
       orderBy: { taskNo: 'asc' },
     });
 
-    const taskControlMap = new Map(rawTaskControls.map((row) => [row.taskNo, row]));
+    const taskControlMap = new Map(
+      rawTaskControls.map((row) => [row.taskNo, row]),
+    );
 
     return Array.from({ length: 25 }, (_, index) => {
       const taskNo = index + 1;
@@ -383,5 +387,19 @@ export class ClientsService {
     });
 
     return this.getTaskControls(id);
+  }
+
+  async deleteClient(id: number) {
+    const client = await this.prisma.client.findUnique({
+      where: { id },
+    });
+
+    if (!client) {
+      throw new BadRequestException('Client not found');
+    }
+
+    return this.prisma.client.delete({
+      where: { id },
+    });
   }
 }

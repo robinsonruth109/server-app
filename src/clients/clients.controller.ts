@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -73,5 +74,10 @@ export class ClientsController {
     @Body() dto: SaveTaskControlDto,
   ) {
     return this.clientsService.saveTaskControls(id, dto);
+  }
+
+  @Delete(':id')
+  deleteClient(@Param('id', ParseIntPipe) id: number) {
+    return this.clientsService.deleteClient(id);
   }
 }
