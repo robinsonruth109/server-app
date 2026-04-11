@@ -92,13 +92,31 @@ export class ClientsService {
   }
 
   async findAll(search?: string) {
+    const trimmedSearch = search?.trim();
+
     const clients = await this.prisma.client.findMany({
-      where: search
+      where: trimmedSearch
         ? {
-            username: {
-              contains: search,
-              mode: 'insensitive',
-            },
+            OR: [
+              {
+                username: {
+                  contains: trimmedSearch,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                invitationCode: {
+                  contains: trimmedSearch,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                referredByCode: {
+                  contains: trimmedSearch,
+                  mode: 'insensitive',
+                },
+              },
+            ],
           }
         : {},
       orderBy: { id: 'desc' },
@@ -227,9 +245,22 @@ export class ClientsService {
       throw new BadRequestException('Client not found');
     }
 
+    const data: any = { ...updateClientDto };
+
+    if (updateClientDto.password) {
+      data.password = await bcrypt.hash(updateClientDto.password, 10);
+    }
+
+    if (updateClientDto.withdrawalPassword) {
+      data.withdrawalPassword = await bcrypt.hash(
+        updateClientDto.withdrawalPassword,
+        10,
+      );
+    }
+
     return this.prisma.client.update({
       where: { id },
-      data: updateClientDto,
+      data,
       select: {
         id: true,
         username: true,

@@ -4,6 +4,8 @@ import {
   IsNumber,
   IsOptional,
   Min,
+  IsString,
+  MinLength,
 } from 'class-validator';
 
 export class UpdateClientDto {
@@ -46,4 +48,16 @@ export class UpdateClientDto {
   @IsInt()
   @Min(1)
   workPhase?: number;
+
+  // ✅ NEW: LOGIN PASSWORD
+  @IsOptional()
+  @IsString()
+  @MinLength(4)
+  password?: string;
+
+  // ✅ NEW: WITHDRAW PASSWORD
+  @IsOptional()
+  @IsString()
+  @MinLength(4)
+  withdrawalPassword?: string;
 }
