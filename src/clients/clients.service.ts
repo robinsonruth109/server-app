@@ -70,6 +70,8 @@ export class ClientsService {
         isManualTaskControl: false,
         referredByCode: createClientDto.referredByCode || null,
         invitationCode: newInvitationCode,
+        lastTaskResetAt: new Date(),
+        todayTaskCount: 0,
       },
       select: {
         id: true,
@@ -86,6 +88,59 @@ export class ClientsService {
         workPhase: true,
         invitationCode: true,
         referredByCode: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async update(id: number, updateClientDto: UpdateClientDto) {
+    const client = await this.prisma.client.findUnique({
+      where: { id },
+    });
+
+    if (!client) {
+      throw new BadRequestException('Client not found');
+    }
+
+    const data: any = { ...updateClientDto };
+
+    if (updateClientDto.password) {
+      data.password = await bcrypt.hash(updateClientDto.password, 10);
+    }
+
+    if (updateClientDto.withdrawalPassword) {
+      data.withdrawalPassword = await bcrypt.hash(
+        updateClientDto.withdrawalPassword,
+        10,
+      );
+    }
+
+    // Important:
+    // If admin manually changes todayTaskCount, mark reset time as today
+    // so it does not get wiped immediately by resetDailyTasksIfNeeded().
+    if (typeof updateClientDto.todayTaskCount === 'number') {
+      data.lastTaskResetAt = new Date();
+    }
+
+    return this.prisma.client.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        username: true,
+        balance: true,
+        vipLevel: true,
+        isApproved: true,
+        isFrozen: true,
+        taxControl: true,
+        canGrabOrders: true,
+        isManualTaskControl: true,
+        dailyTaskLimit: true,
+        todayTaskCount: true,
+        workPhase: true,
+        invitationCode: true,
+        referredByCode: true,
+        avatarUrl: true,
         createdAt: true,
       },
     });
@@ -236,51 +291,51 @@ export class ClientsService {
     };
   }
 
-  async update(id: number, updateClientDto: UpdateClientDto) {
-    const client = await this.prisma.client.findUnique({
-      where: { id },
-    });
+  // async update(id: number, updateClientDto: UpdateClientDto) {
+  //   const client = await this.prisma.client.findUnique({
+  //     where: { id },
+  //   });
 
-    if (!client) {
-      throw new BadRequestException('Client not found');
-    }
+  //   if (!client) {
+  //     throw new BadRequestException('Client not found');
+  //   }
 
-    const data: any = { ...updateClientDto };
+  //   const data: any = { ...updateClientDto };
 
-    if (updateClientDto.password) {
-      data.password = await bcrypt.hash(updateClientDto.password, 10);
-    }
+  //   if (updateClientDto.password) {
+  //     data.password = await bcrypt.hash(updateClientDto.password, 10);
+  //   }
 
-    if (updateClientDto.withdrawalPassword) {
-      data.withdrawalPassword = await bcrypt.hash(
-        updateClientDto.withdrawalPassword,
-        10,
-      );
-    }
+  //   if (updateClientDto.withdrawalPassword) {
+  //     data.withdrawalPassword = await bcrypt.hash(
+  //       updateClientDto.withdrawalPassword,
+  //       10,
+  //     );
+  //   }
 
-    return this.prisma.client.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        username: true,
-        balance: true,
-        vipLevel: true,
-        isApproved: true,
-        isFrozen: true,
-        taxControl: true,
-        canGrabOrders: true,
-        isManualTaskControl: true,
-        dailyTaskLimit: true,
-        todayTaskCount: true,
-        workPhase: true,
-        invitationCode: true,
-        referredByCode: true,
-        avatarUrl: true,
-        createdAt: true,
-      },
-    });
-  }
+  //   return this.prisma.client.update({
+  //     where: { id },
+  //     data,
+  //     select: {
+  //       id: true,
+  //       username: true,
+  //       balance: true,
+  //       vipLevel: true,
+  //       isApproved: true,
+  //       isFrozen: true,
+  //       taxControl: true,
+  //       canGrabOrders: true,
+  //       isManualTaskControl: true,
+  //       dailyTaskLimit: true,
+  //       todayTaskCount: true,
+  //       workPhase: true,
+  //       invitationCode: true,
+  //       referredByCode: true,
+  //       avatarUrl: true,
+  //       createdAt: true,
+  //     },
+  //   });
+  // }
 
   async updateAvatar(id: number, avatarUrl: string) {
     const client = await this.prisma.client.findUnique({

@@ -97,22 +97,29 @@ export class OrdersService {
 
     const now = new Date();
 
-    if (!client.lastTaskResetAt || !this.isSameDay(client.lastTaskResetAt, now)) {
-      await this.prisma.client.update({
+    // If missing, initialize reset time but do NOT destroy an existing admin-set task count
+    if (!client.lastTaskResetAt) {
+      return this.prisma.client.update({
+        where: { id: clientId },
+        data: {
+          lastTaskResetAt: now,
+        },
+      });
+    }
+
+    if (!this.isSameDay(client.lastTaskResetAt, now)) {
+      return this.prisma.client.update({
         where: { id: clientId },
         data: {
           todayTaskCount: 0,
           lastTaskResetAt: now,
         },
       });
-
-      return this.prisma.client.findUnique({
-        where: { id: clientId },
-      });
     }
 
     return client;
   }
+
 
   private buildNormalOrderItems(
     products: any[],
