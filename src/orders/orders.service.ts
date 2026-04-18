@@ -45,6 +45,24 @@ export class OrdersService {
     return 1;
   }
 
+  private getAllowedPlatformByVip(vipLevel: number) {
+    if (vipLevel === 1) return 'Amazon';
+    if (vipLevel === 2) return 'Alibaba';
+    return 'Aliexpress';
+  }
+
+  private getAllowedBalanceTextByVip(vipLevel: number, settings: any) {
+    if (vipLevel === 1) {
+      return `${settings.vip1MinBalance} to ${settings.vip1MaxBalance} USDT`;
+    }
+
+    if (vipLevel === 2) {
+      return `${settings.vip2MinBalance} to ${settings.vip2MaxBalance} USDT`;
+    }
+
+    return `${settings.vip3MinBalance} USDT and above`;
+  }
+
   private generateOrderNo() {
     return `${Date.now()}${Math.floor(Math.random() * 10000)}`;
   }
@@ -78,12 +96,15 @@ export class OrdersService {
     };
   }
 
-  private isSameDay(dateA: Date, dateB: Date) {
-    return (
-      dateA.getFullYear() === dateB.getFullYear() &&
-      dateA.getMonth() === dateB.getMonth() &&
-      dateA.getDate() === dateB.getDate()
-    );
+  private shuffleArray<T>(items: T[]): T[] {
+    const array = [...items];
+
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+
+    return array;
   }
 
   private async resetDailyTasksIfNeeded(clientId: number) {
@@ -95,24 +116,13 @@ export class OrdersService {
       throw new BadRequestException('Client not found');
     }
 
-    const now = new Date();
-
-    // If missing, initialize reset time but do NOT destroy an existing admin-set task count
+    // Do not auto-reset todayTaskCount anymore.
+    // Only ensure lastTaskResetAt exists.
     if (!client.lastTaskResetAt) {
       return this.prisma.client.update({
         where: { id: clientId },
         data: {
-          lastTaskResetAt: now,
-        },
-      });
-    }
-
-    if (!this.isSameDay(client.lastTaskResetAt, now)) {
-      return this.prisma.client.update({
-        where: { id: clientId },
-        data: {
-          todayTaskCount: 0,
-          lastTaskResetAt: now,
+          lastTaskResetAt: new Date(),
         },
       });
     }
@@ -120,13 +130,9 @@ export class OrdersService {
     return client;
   }
 
-
-  private buildNormalOrderItems(
-    products: any[],
-    balance: number,
-    settings: any,
-  ) {
-    const selected = products.slice(0, 3);
+  private buildNormalOrderItems(products: any[], balance: number) {
+    const targetAmount = Number((balance * 0.8).toFixed(2));
+    const selected = products.slice(0, Math.min(3, products.length));
 
     let items: {
       productId: number;
@@ -139,9 +145,29 @@ export class OrdersService {
 
     let total = 0;
 
-    for (const product of selected) {
-      const qty = 1;
-      const subtotal = Number((product.price * qty).toFixed(2));
+    for (let index = 0; index < selected.length; index++) {
+      const product = selected[index];
+      const remaining = Number((targetAmount - total).toFixed(2));
+
+      if (remaining <= 0) break;
+
+      const remainingSlots = selected.length - index;
+      const targetForThisItem =
+        remainingSlots === 1
+          ? remaining
+          : Number((remaining / remainingSlots).toFixed(2));
+
+      let qty = Math.max(1, Math.floor(targetForThisItem / product.price));
+      let subtotal = Number((product.price * qty).toFixed(2));
+
+      while (subtotal > remaining && qty > 1) {
+        qty -= 1;
+        subtotal = Number((product.price * qty).toFixed(2));
+      }
+
+      if (subtotal <= 0) {
+        continue;
+      }
 
       items.push({
         productId: product.id,
@@ -152,52 +178,28 @@ export class OrdersService {
         subtotal,
       });
 
-      total += subtotal;
+      total = Number((total + subtotal).toFixed(2));
     }
 
-    total = Number(total.toFixed(2));
-    const maxNormalAmount = Number(
-      (balance * settings.normalOrderRatio).toFixed(2),
-    );
+    if (items.length > 0) {
+      const lastIndex = items.length - 1;
+      const remaining = Number((targetAmount - total).toFixed(2));
 
-    if (total > maxNormalAmount && items.length > 0) {
-      items = [];
-      total = 0;
+      if (remaining >= items[lastIndex].unitPrice) {
+        const extraQty = Math.floor(remaining / items[lastIndex].unitPrice);
 
-      for (const product of selected) {
-        if (total + product.price <= maxNormalAmount) {
-          const qty = 1;
-          const subtotal = Number((product.price * qty).toFixed(2));
+        if (extraQty > 0) {
+          items[lastIndex].quantity += extraQty;
+          items[lastIndex].subtotal = Number(
+            (
+              items[lastIndex].unitPrice * items[lastIndex].quantity
+            ).toFixed(2),
+          );
 
-          items.push({
-            productId: product.id,
-            productName: product.name,
-            imageUrl: product.imageUrl,
-            unitPrice: product.price,
-            quantity: qty,
-            subtotal,
-          });
-
-          total += subtotal;
+          total = Number(
+            items.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2),
+          );
         }
-      }
-
-      if (items.length === 0 && selected.length > 0) {
-        const first = selected[0];
-        const cappedSubtotal = Number(
-          Math.min(first.price, maxNormalAmount).toFixed(2),
-        );
-
-        items.push({
-          productId: first.id,
-          productName: first.name,
-          imageUrl: first.imageUrl,
-          unitPrice: cappedSubtotal,
-          quantity: 1,
-          subtotal: cappedSubtotal,
-        });
-
-        total = cappedSubtotal;
       }
     }
 
@@ -208,7 +210,7 @@ export class OrdersService {
   }
 
   private buildComboOrderItems(products: any[], targetAmount: number) {
-    const selected = products.slice(0, 3);
+    const selected = products.slice(0, Math.min(3, products.length));
 
     let items: {
       productId: number;
@@ -299,8 +301,16 @@ export class OrdersService {
     }
 
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const yesterdayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+    );
 
     const todayCompletedOrders = await this.prisma.order.findMany({
       where: {
@@ -350,7 +360,10 @@ export class OrdersService {
 
     const cashGapBetweenTasks = currentIncompleteOrder
       ? Number(
-          Math.max(currentIncompleteOrder.orderAmount - client.balance, 0).toFixed(4),
+          Math.max(
+            currentIncompleteOrder.orderAmount - client.balance,
+            0,
+          ).toFixed(4),
         )
       : 0;
 
@@ -391,7 +404,7 @@ export class OrdersService {
       );
     }
 
-    if (client.todayTaskCount >= settings.dailyTaskLimit) {
+    if (client.todayTaskCount >= client.dailyTaskLimit) {
       throw new BadRequestException('Daily task limit reached');
     }
 
@@ -413,6 +426,13 @@ export class OrdersService {
     }
 
     const vipLevel = this.getVipByBalance(client.balance, settings);
+    const allowedPlatform = this.getAllowedPlatformByVip(vipLevel);
+
+    if (dto.platform.toLowerCase() !== allowedPlatform.toLowerCase()) {
+      throw new BadRequestException(
+        `You can't grab orders with ${dto.platform} because your balance is ${client.balance}. ${allowedPlatform} is allowed for balances ${this.getAllowedBalanceTextByVip(vipLevel, settings)}.`,
+      );
+    }
 
     const products = await this.prisma.product.findMany({
       where: {
@@ -430,6 +450,7 @@ export class OrdersService {
       );
     }
 
+    const randomizedProducts = this.shuffleArray(products);
     const currentTaskNo = client.todayTaskCount + 1;
 
     let selectedProducts: {
@@ -457,7 +478,7 @@ export class OrdersService {
 
       if (manualControl?.taskAmount && manualControl.taskAmount > 0) {
         const manualBuild = this.buildExactManualComboItems(
-          products,
+          randomizedProducts,
           manualControl.taskAmount,
         );
 
@@ -471,9 +492,8 @@ export class OrdersService {
             : this.getPlatformCommissionRate(dto.platform, settings, vipLevel);
       } else {
         const normalBuild = this.buildNormalOrderItems(
-          products,
+          randomizedProducts,
           client.balance,
-          settings,
         );
 
         selectedProducts = normalBuild.items;
@@ -499,16 +519,18 @@ export class OrdersService {
           (client.balance + settings.comboExtraAmount).toFixed(2),
         );
 
-        const comboBuild = this.buildComboOrderItems(products, targetAmount);
+        const comboBuild = this.buildComboOrderItems(
+          randomizedProducts,
+          targetAmount,
+        );
         selectedProducts = comboBuild.items;
         orderAmount = comboBuild.orderAmount;
         orderType = 'combo';
         commissionRate = defaultCommissionRate;
       } else {
         const normalBuild = this.buildNormalOrderItems(
-          products,
+          randomizedProducts,
           client.balance,
-          settings,
         );
         selectedProducts = normalBuild.items;
         orderAmount = normalBuild.orderAmount;
@@ -586,6 +608,7 @@ export class OrdersService {
         todayTaskCount: {
           increment: 1,
         },
+        lastTaskResetAt: new Date(),
         vipLevel: this.getVipByBalance(newBalance, settings),
       },
     });
