@@ -223,16 +223,27 @@ export class OrdersService {
 
     let total = 0;
 
-    for (const product of selected) {
-      const remainingProducts = 3 - items.length;
-      const remainingTarget = Math.max(targetAmount - total, 0);
-      const baseTargetPerProduct =
-        remainingProducts > 0
-          ? remainingTarget / remainingProducts
-          : remainingTarget;
+    for (let index = 0; index < selected.length; index++) {
+      const product = selected[index];
+      const remaining = Number((targetAmount - total).toFixed(2));
 
-      const qty = Math.max(1, Math.floor(baseTargetPerProduct / product.price));
-      const subtotal = Number((product.price * qty).toFixed(2));
+      if (remaining <= 0) break;
+
+      const remainingSlots = selected.length - index;
+      const targetForThisItem =
+        remainingSlots === 1
+          ? remaining
+          : Number((remaining / remainingSlots).toFixed(2));
+
+      let qty = Math.max(1, Math.floor(targetForThisItem / product.price));
+      let subtotal = Number((product.price * qty).toFixed(2));
+
+      while (subtotal > remaining && qty > 1) {
+        qty -= 1;
+        subtotal = Number((product.price * qty).toFixed(2));
+      }
+
+      if (subtotal <= 0) continue;
 
       items.push({
         productId: product.id,
@@ -243,31 +254,29 @@ export class OrdersService {
         subtotal,
       });
 
-      total += subtotal;
+      total = Number((total + subtotal).toFixed(2));
     }
 
-    total = Number(total.toFixed(2));
+    if (items.length > 0) {
+      let remaining = Number((targetAmount - total).toFixed(2));
 
-    if (items.length > 0 && total < targetAmount) {
-      const lastIndex = items.length - 1;
-      const diff = Number((targetAmount - total).toFixed(2));
+      // try to increase quantities to get closer to target
+      for (let i = 0; i < items.length && remaining > 0; i++) {
+        const item = items[i];
+        const extraQty = Math.floor(remaining / item.unitPrice);
 
-      const extraQty = Math.max(
-        0,
-        Math.ceil(diff / Math.max(items[lastIndex].unitPrice, 1)),
-      );
-
-      if (extraQty > 0) {
-        items[lastIndex].quantity += extraQty;
-        items[lastIndex].subtotal = Number(
-          (items[lastIndex].unitPrice * items[lastIndex].quantity).toFixed(2),
-        );
+        if (extraQty > 0) {
+          item.quantity += extraQty;
+          item.subtotal = Number((item.unitPrice * item.quantity).toFixed(2));
+          total = Number(
+            items.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2),
+          );
+          remaining = Number((targetAmount - total).toFixed(2));
+        }
       }
-
-      total = Number(
-        items.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2),
-      );
     }
+
+    total = Number(items.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2));
 
     return {
       items,
@@ -276,20 +285,98 @@ export class OrdersService {
   }
 
   private buildExactManualComboItems(products: any[], targetAmount: number) {
-    const product = products[0];
+    const selected = products.slice(0, Math.min(3, products.length));
+
+    let items: {
+      productId: number;
+      productName: string;
+      imageUrl: string;
+      unitPrice: number;
+      quantity: number;
+      subtotal: number;
+    }[] = [];
+
+    let total = 0;
+
+    for (let index = 0; index < selected.length; index++) {
+      const product = selected[index];
+      const remaining = Number((targetAmount - total).toFixed(2));
+
+      if (remaining <= 0) break;
+
+      const remainingSlots = selected.length - index;
+      const targetForThisItem =
+        remainingSlots === 1
+          ? remaining
+          : Number((remaining / remainingSlots).toFixed(2));
+
+      let qty = Math.max(1, Math.floor(targetForThisItem / product.price));
+      let subtotal = Number((product.price * qty).toFixed(2));
+
+      while (subtotal > remaining && qty > 1) {
+        qty -= 1;
+        subtotal = Number((product.price * qty).toFixed(2));
+      }
+
+      if (subtotal <= 0) continue;
+
+      items.push({
+        productId: product.id,
+        productName: product.name,
+        imageUrl: product.imageUrl,
+        unitPrice: product.price,
+        quantity: qty,
+        subtotal,
+      });
+
+      total = Number((total + subtotal).toFixed(2));
+    }
+
+    if (items.length === 0 && selected.length > 0) {
+      const first = selected[0];
+
+      items.push({
+        productId: first.id,
+        productName: first.name,
+        imageUrl: first.imageUrl,
+        unitPrice: first.price,
+        quantity: 1,
+        subtotal: Number(first.price.toFixed(2)),
+      });
+
+      total = Number(first.price.toFixed(2));
+    }
+
+    let remaining = Number((targetAmount - total).toFixed(2));
+
+    // Greedy increase across all selected items until near target
+    if (items.length > 0 && remaining > 0) {
+      let changed = true;
+
+      while (remaining > 0 && changed) {
+        changed = false;
+
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].unitPrice <= remaining) {
+            items[i].quantity += 1;
+            items[i].subtotal = Number(
+              (items[i].unitPrice * items[i].quantity).toFixed(2),
+            );
+            total = Number(
+              items.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2),
+            );
+            remaining = Number((targetAmount - total).toFixed(2));
+            changed = true;
+          }
+        }
+      }
+    }
+
+    total = Number(items.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2));
 
     return {
-      items: [
-        {
-          productId: product.id,
-          productName: product.name,
-          imageUrl: product.imageUrl,
-          unitPrice: Number(targetAmount.toFixed(2)),
-          quantity: 1,
-          subtotal: Number(targetAmount.toFixed(2)),
-        },
-      ],
-      orderAmount: Number(targetAmount.toFixed(2)),
+      items,
+      orderAmount: total,
     };
   }
 
